@@ -1,260 +1,423 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      font-family: Arial, sans-serif;
-    }
-    
-    canvas {
-      border: 4px solid #1919A6;
-      box-shadow: 0 0 20px rgba(25, 25, 166, 0.5);
-    }
-    
-    .game-info {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      color: #fff;
-      font-size: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pasta Pac-Man</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #gameContainer {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        #gameCanvas {
+            border: 3px solid #333;
+            display: block;
+            background: #000;
+        }
+        
+        #score {
+            text-align: center;
+            font-size: 24px;
+            margin-top: 15px;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        #gameOver {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+            font-size: 20px;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        #instructions {
+            text-align: center;
+            margin-top: 15px;
+            color: white;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
-  <div class="game-info">
-    <div>PASTA-MAN</div>
-    <div style="font-size: 16px; margin-top: 10px;">Score: <span id="score">0</span></div>
-  </div>
-  <canvas id="gameCanvas" width="600" height="600"></canvas>
-  
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreElement = document.getElementById('score');
+    <h1>🍝 Pasta Pac-Man 🍝</h1>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div id="score">Score: 0 | Lives: 3</div>
+        <div id="gameOver">GAME OVER! Press R to Restart</div>
+    </div>
+    <div id="instructions">Use Arrow Keys to Move | Eat all the Orecchiette! | Avoid the Farfalle!</div>
     
-    // Game state
-    let score = 0;
-    let pacmanAngle = 0.2;
-    let mouthOpen = true;
-    let pacmanDirection = 0; // 0: right, 1: down, 2: left, 3: up
-    
-    // Pac-Man position
-    const pacman = {
-      x: 100,
-      y: 100,
-      size: 30
-    };
-    
-    // Pasta dots (macaroni, fusilli, farfalle)
-    const pastas = [];
-    const pastaTypes = ['macaroni', 'fusilli', 'farfalle'];
-    
-    // Create pasta grid
-    for (let row = 0; row < 12; row++) {
-      for (let col = 0; col < 12; col++) {
-        if ((row === 2 && col === 2) || Math.random() > 0.2) { // Skip some spots for walls
-          pastas.push({
-            x: 80 + col * 45,
-            y: 80 + row * 45,
-            type: pastaTypes[Math.floor(Math.random() * pastaTypes.length)],
-            eaten: (row === 2 && col === 2) // Starting position
-          });
-        }
-      }
-    }
-    
-    // Draw shell-shaped Pac-Man
-    function drawShellPacman(x, y, size, angle, direction) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(direction * Math.PI / 2);
-      
-      // Shell body (yellow-orange)
-      ctx.fillStyle = '#FFD700';
-      ctx.beginPath();
-      ctx.arc(0, 0, size, angle, Math.PI * 2 - angle);
-      ctx.lineTo(0, 0);
-      ctx.fill();
-      
-      // Shell ridges
-      ctx.strokeStyle = '#FFA500';
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        const startAngle = angle + (Math.PI * 2 - 2 * angle) * (i / 5);
-        const endAngle = angle + (Math.PI * 2 - 2 * angle) * ((i + 0.5) / 5);
-        ctx.arc(0, 0, size - 5, startAngle, endAngle);
-        ctx.stroke();
-      }
-      
-      // Eye
-      if (angle < 0.3) {
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(size * 0.3, -size * 0.3, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
-      ctx.restore();
-    }
-    
-    // Draw different pasta shapes
-    function drawPasta(x, y, type) {
-      ctx.save();
-      ctx.translate(x, y);
-      
-      if (type === 'macaroni') {
-        // Elbow macaroni (small curved tube)
-        ctx.strokeStyle = '#F4E4C1';
-        ctx.fillStyle = '#F4E4C1';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI);
-        ctx.stroke();
-      } else if (type === 'fusilli') {
-        // Fusilli (spiral)
-        ctx.strokeStyle = '#F4E4C1';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < 3; i++) {
-          ctx.arc(-3 + i * 3, 0, 2, 0, Math.PI * 2);
-        }
-        ctx.stroke();
-      } else if (type === 'farfalle') {
-        // Farfalle (bow-tie)
-        ctx.fillStyle = '#F4E4C1';
-        ctx.beginPath();
-        ctx.moveTo(-4, 0);
-        ctx.lineTo(-2, -3);
-        ctx.lineTo(2, -3);
-        ctx.lineTo(4, 0);
-        ctx.lineTo(2, 3);
-        ctx.lineTo(-2, 3);
-        ctx.closePath();
-        ctx.fill();
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('gameOver');
         
-        // Center crimp
-        ctx.strokeStyle = '#D4C4A1';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-1, -2);
-        ctx.lineTo(-1, 2);
-        ctx.moveTo(1, -2);
-        ctx.lineTo(1, 2);
-        ctx.stroke();
-      }
-      
-      ctx.restore();
-    }
-    
-    // Draw maze walls
-    function drawMaze() {
-      ctx.strokeStyle = '#1919A6';
-      ctx.lineWidth = 4;
-      
-      // Outer walls
-      ctx.strokeRect(50, 50, 500, 500);
-      
-      // Inner walls (simple maze structure)
-      const walls = [
-        [150, 150, 200, 150],
-        [150, 150, 150, 250],
-        [350, 150, 400, 150],
-        [400, 150, 400, 250],
-        [250, 250, 350, 250],
-        [150, 350, 200, 350],
-        [150, 350, 150, 450],
-        [350, 350, 400, 350],
-        [400, 350, 400, 450],
-        [250, 450, 350, 450]
-      ];
-      
-      walls.forEach(wall => {
-        ctx.beginPath();
-        ctx.moveTo(wall[0], wall[1]);
-        ctx.lineTo(wall[2], wall[3]);
-        ctx.stroke();
-      });
-    }
-    
-    // Main draw function
-    function draw() {
-      // Clear canvas
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw maze
-      drawMaze();
-      
-      // Draw pasta dots
-      pastas.forEach(pasta => {
-        if (!pasta.eaten) {
-          drawPasta(pasta.x, pasta.y, pasta.type);
+        const CELL_SIZE = 30;
+        const GRID_WIDTH = 20;
+        const GRID_HEIGHT = 20;
+        
+        // Game state
+        let score = 0;
+        let lives = 3;
+        let gameActive = true;
+        let powerUpActive = false;
+        let powerUpTimer = 0;
+        
+        // Maze layout (1 = wall, 0 = path)
+        const maze = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+            [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1,1,0,1],
+            [1,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,0,1],
+            [1,1,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,1,1],
+            [1,1,1,1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,1,1],
+            [1,1,1,1,0,1,0,1,1,0,0,1,1,0,1,0,1,1,1,1],
+            [0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0],
+            [1,1,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1,1,1,1],
+            [1,1,1,1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,1,1],
+            [1,1,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+            [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,1,0,1,0,1,0,1,1,1,1,1,1,0,1,0,1,0,1,1],
+            [1,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+        
+        // Player (Conchiglie)
+        let player = {
+            x: 1,
+            y: 1,
+            direction: 0, // 0=right, 1=down, 2=left, 3=up
+            nextDirection: 0,
+            speed: 0.15
+        };
+        
+        // Ghosts (Farfalle)
+        let ghosts = [
+            { x: 9, y: 9, color: '#FF0000', dx: 1, dy: 0 },
+            { x: 10, y: 9, color: '#FFB8FF', dx: -1, dy: 0 },
+            { x: 9, y: 10, color: '#00FFFF', dx: 0, dy: 1 },
+            { x: 10, y: 10, color: '#FFB852', dx: 0, dy: -1 }
+        ];
+        
+        // Pellets (Orecchiette)
+        let pellets = [];
+        
+        // Initialize pellets
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            for (let x = 0; x < GRID_WIDTH; x++) {
+                if (maze[y][x] === 0) {
+                    pellets.push({ x, y, eaten: false });
+                }
+            }
         }
-      });
-      
-      // Draw Pac-Man
-      drawShellPacman(pacman.x, pacman.y, pacman.size, pacmanAngle, pacmanDirection);
-      
-      // Animate mouth
-      if (mouthOpen) {
-        pacmanAngle += 0.02;
-        if (pacmanAngle > 0.6) mouthOpen = false;
-      } else {
-        pacmanAngle -= 0.02;
-        if (pacmanAngle < 0.1) mouthOpen = true;
-      }
-      
-      // Check for pasta eating
-      pastas.forEach(pasta => {
-        if (!pasta.eaten) {
-          const dx = pasta.x - pacman.x;
-          const dy = pasta.y - pacman.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < pacman.size) {
-            pasta.eaten = true;
-            score += 10;
-            scoreElement.textContent = score;
-          }
+        
+        // Keyboard controls
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            
+            if (e.key === 'ArrowUp') player.nextDirection = 3;
+            if (e.key === 'ArrowDown') player.nextDirection = 1;
+            if (e.key === 'ArrowLeft') player.nextDirection = 2;
+            if (e.key === 'ArrowRight') player.nextDirection = 0;
+            
+            if (e.key === 'r' || e.key === 'R') {
+                if (!gameActive) resetGame();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            gameActive = true;
+            player.x = 1;
+            player.y = 1;
+            player.direction = 0;
+            player.nextDirection = 0;
+            
+            ghosts = [
+                { x: 9, y: 9, color: '#FF0000', dx: 1, dy: 0 },
+                { x: 10, y: 9, color: '#FFB8FF', dx: -1, dy: 0 },
+                { x: 9, y: 10, color: '#00FFFF', dx: 0, dy: 1 },
+                { x: 10, y: 10, color: '#FFB852', dx: 0, dy: -1 }
+            ];
+            
+            pellets = [];
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (maze[y][x] === 0) {
+                        pellets.push({ x, y, eaten: false });
+                    }
+                }
+            }
+            
+            gameOverElement.style.display = 'none';
         }
-      });
-      
-      requestAnimationFrame(draw);
-    }
-    
-    // Keyboard controls
-    document.addEventListener('keydown', (e) => {
-      const speed = 5;
-      
-      switch(e.key) {
-        case 'ArrowRight':
-          pacman.x = Math.min(pacman.x + speed, 520);
-          pacmanDirection = 0;
-          break;
-        case 'ArrowLeft':
-          pacman.x = Math.max(pacman.x - speed, 80);
-          pacmanDirection = 2;
-          break;
-        case 'ArrowDown':
-          pacman.y = Math.min(pacman.y + speed, 520);
-          pacmanDirection = 1;
-          break;
-        case 'ArrowUp':
-          pacman.y = Math.max(pacman.y - speed, 80);
-          pacmanDirection = 3;
-          break;
-      }
-    });
-    
-    // Start animation
-    draw();
-  </script>
+        
+        function canMove(x, y) {
+            const gridX = Math.floor(x);
+            const gridY = Math.floor(y);
+            
+            if (gridX < 0 || gridX >= GRID_WIDTH || gridY < 0 || gridY >= GRID_HEIGHT) {
+                return false;
+            }
+            
+            return maze[gridY][gridX] === 0;
+        }
+        
+        function updatePlayer() {
+            if (!gameActive) return;
+            
+            // Try to change direction
+            const directions = [
+                { dx: 1, dy: 0 },  // right
+                { dx: 0, dy: 1 },  // down
+                { dx: -1, dy: 0 }, // left
+                { dx: 0, dy: -1 }  // up
+            ];
+            
+            const nextDir = directions[player.nextDirection];
+            const newX = player.x + nextDir.dx * player.speed;
+            const newY = player.y + nextDir.dy * player.speed;
+            
+            if (canMove(newX, newY)) {
+                player.direction = player.nextDirection;
+            }
+            
+            // Move in current direction
+            const currentDir = directions[player.direction];
+            const moveX = player.x + currentDir.dx * player.speed;
+            const moveY = player.y + currentDir.dy * player.speed;
+            
+            if (canMove(moveX, moveY)) {
+                player.x = moveX;
+                player.y = moveY;
+            }
+            
+            // Wrap around edges
+            if (player.x < 0) player.x = GRID_WIDTH - 1;
+            if (player.x >= GRID_WIDTH) player.x = 0;
+            
+            // Check pellet collision
+            const gridX = Math.floor(player.x);
+            const gridY = Math.floor(player.y);
+            
+            pellets.forEach(pellet => {
+                if (!pellet.eaten && pellet.x === gridX && pellet.y === gridY) {
+                    pellet.eaten = true;
+                    score += 10;
+                }
+            });
+            
+            // Check if won
+            if (pellets.every(p => p.eaten)) {
+                gameActive = false;
+                gameOverElement.textContent = 'YOU WIN! Press R to Restart';
+                gameOverElement.style.display = 'block';
+            }
+        }
+        
+        function updateGhosts() {
+            if (!gameActive) return;
+            
+            ghosts.forEach(ghost => {
+                const directions = [
+                    { dx: 1, dy: 0 },
+                    { dx: 0, dy: 1 },
+                    { dx: -1, dy: 0 },
+                    { dx: 0, dy: -1 }
+                ];
+                
+                // Try to move
+                const newX = ghost.x + ghost.dx * 0.05;
+                const newY = ghost.y + ghost.dy * 0.05;
+                
+                if (canMove(newX, newY)) {
+                    ghost.x = newX;
+                    ghost.y = newY;
+                } else {
+                    // Change direction randomly
+                    const validDirs = directions.filter(dir => 
+                        canMove(ghost.x + dir.dx * 0.1, ghost.y + dir.dy * 0.1)
+                    );
+                    
+                    if (validDirs.length > 0) {
+                        const randomDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+                        ghost.dx = randomDir.dx;
+                        ghost.dy = randomDir.dy;
+                    }
+                }
+                
+                // Check collision with player
+                const dist = Math.sqrt(
+                    Math.pow(player.x - ghost.x, 2) + 
+                    Math.pow(player.y - ghost.y, 2)
+                );
+                
+                if (dist < 0.5) {
+                    lives--;
+                    if (lives <= 0) {
+                        gameActive = false;
+                        gameOverElement.textContent = 'GAME OVER! Press R to Restart';
+                        gameOverElement.style.display = 'block';
+                    } else {
+                        // Reset player position
+                        player.x = 1;
+                        player.y = 1;
+                    }
+                }
+            });
+        }
+        
+        function drawMaze() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#2a2a4e';
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (maze[y][x] === 1) {
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                        ctx.strokeStyle = '#3a3a6e';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+            }
+        }
+        
+        function drawPellets() {
+            pellets.forEach(pellet => {
+                if (!pellet.eaten) {
+                    // Draw orecchiette (ear-shaped pasta)
+                    const x = pellet.x * CELL_SIZE + CELL_SIZE / 2;
+                    const y = pellet.y * CELL_SIZE + CELL_SIZE / 2;
+                    
+                    ctx.fillStyle = '#F5DEB3';
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, 4, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#D2B48C';
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, 2, 3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+        
+        function drawPlayer() {
+            const x = player.x * CELL_SIZE + CELL_SIZE / 2;
+            const y = player.y * CELL_SIZE + CELL_SIZE / 2;
+            
+            // Draw conchiglie (shell pasta)
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(player.direction * Math.PI / 2);
+            
+            // Shell body
+            ctx.fillStyle = '#FFE4B5';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 10, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Shell ridges
+            ctx.strokeStyle = '#DEB887';
+            ctx.lineWidth = 1.5;
+            for (let i = -8; i <= 8; i += 4) {
+                ctx.beginPath();
+                ctx.arc(0, i, 8, -Math.PI / 3, Math.PI / 3);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+        
+        function drawGhosts() {
+            ghosts.forEach(ghost => {
+                const x = ghost.x * CELL_SIZE + CELL_SIZE / 2;
+                const y = ghost.y * CELL_SIZE + CELL_SIZE / 2;
+                
+                // Draw farfalle (bow-tie pasta)
+                ctx.fillStyle = ghost.color;
+                
+                // Left wing
+                ctx.beginPath();
+                ctx.moveTo(x - 8, y);
+                ctx.quadraticCurveTo(x - 10, y - 6, x - 4, y - 8);
+                ctx.quadraticCurveTo(x - 2, y - 6, x, y);
+                ctx.quadraticCurveTo(x - 2, y + 6, x - 4, y + 8);
+                ctx.quadraticCurveTo(x - 10, y + 6, x - 8, y);
+                ctx.fill();
+                
+                // Right wing
+                ctx.beginPath();
+                ctx.moveTo(x + 8, y);
+                ctx.quadraticCurveTo(x + 10, y - 6, x + 4, y - 8);
+                ctx.quadraticCurveTo(x + 2, y - 6, x, y);
+                ctx.quadraticCurveTo(x + 2, y + 6, x + 4, y + 8);
+                ctx.quadraticCurveTo(x + 10, y + 6, x + 8, y);
+                ctx.fill();
+                
+                // Center knot
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(x - 2, y - 3, 4, 6);
+            });
+        }
+        
+        function updateScore() {
+            scoreElement.textContent = Score: ${score} | Lives: ${lives};
+        }
+        
+        function gameLoop() {
+            updatePlayer();
+            updateGhosts();
+            
+            drawMaze();
+            drawPellets();
+            drawGhosts();
+            drawPlayer();
+            updateScore();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        gameLoop();
+    </script>
 </body>
 </html>
