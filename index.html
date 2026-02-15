@@ -1,0 +1,260 @@
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+    }
+    
+    canvas {
+      border: 4px solid #1919A6;
+      box-shadow: 0 0 20px rgba(25, 25, 166, 0.5);
+    }
+    
+    .game-info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #fff;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-info">
+    <div>PASTA-MAN</div>
+    <div style="font-size: 16px; margin-top: 10px;">Score: <span id="score">0</span></div>
+  </div>
+  <canvas id="gameCanvas" width="600" height="600"></canvas>
+  
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    
+    // Game state
+    let score = 0;
+    let pacmanAngle = 0.2;
+    let mouthOpen = true;
+    let pacmanDirection = 0; // 0: right, 1: down, 2: left, 3: up
+    
+    // Pac-Man position
+    const pacman = {
+      x: 100,
+      y: 100,
+      size: 30
+    };
+    
+    // Pasta dots (macaroni, fusilli, farfalle)
+    const pastas = [];
+    const pastaTypes = ['macaroni', 'fusilli', 'farfalle'];
+    
+    // Create pasta grid
+    for (let row = 0; row < 12; row++) {
+      for (let col = 0; col < 12; col++) {
+        if ((row === 2 && col === 2) || Math.random() > 0.2) { // Skip some spots for walls
+          pastas.push({
+            x: 80 + col * 45,
+            y: 80 + row * 45,
+            type: pastaTypes[Math.floor(Math.random() * pastaTypes.length)],
+            eaten: (row === 2 && col === 2) // Starting position
+          });
+        }
+      }
+    }
+    
+    // Draw shell-shaped Pac-Man
+    function drawShellPacman(x, y, size, angle, direction) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(direction * Math.PI / 2);
+      
+      // Shell body (yellow-orange)
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(0, 0, size, angle, Math.PI * 2 - angle);
+      ctx.lineTo(0, 0);
+      ctx.fill();
+      
+      // Shell ridges
+      ctx.strokeStyle = '#FFA500';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        const startAngle = angle + (Math.PI * 2 - 2 * angle) * (i / 5);
+        const endAngle = angle + (Math.PI * 2 - 2 * angle) * ((i + 0.5) / 5);
+        ctx.arc(0, 0, size - 5, startAngle, endAngle);
+        ctx.stroke();
+      }
+      
+      // Eye
+      if (angle < 0.3) {
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(size * 0.3, -size * 0.3, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+    }
+    
+    // Draw different pasta shapes
+    function drawPasta(x, y, type) {
+      ctx.save();
+      ctx.translate(x, y);
+      
+      if (type === 'macaroni') {
+        // Elbow macaroni (small curved tube)
+        ctx.strokeStyle = '#F4E4C1';
+        ctx.fillStyle = '#F4E4C1';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI);
+        ctx.stroke();
+      } else if (type === 'fusilli') {
+        // Fusilli (spiral)
+        ctx.strokeStyle = '#F4E4C1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          ctx.arc(-3 + i * 3, 0, 2, 0, Math.PI * 2);
+        }
+        ctx.stroke();
+      } else if (type === 'farfalle') {
+        // Farfalle (bow-tie)
+        ctx.fillStyle = '#F4E4C1';
+        ctx.beginPath();
+        ctx.moveTo(-4, 0);
+        ctx.lineTo(-2, -3);
+        ctx.lineTo(2, -3);
+        ctx.lineTo(4, 0);
+        ctx.lineTo(2, 3);
+        ctx.lineTo(-2, 3);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Center crimp
+        ctx.strokeStyle = '#D4C4A1';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-1, -2);
+        ctx.lineTo(-1, 2);
+        ctx.moveTo(1, -2);
+        ctx.lineTo(1, 2);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    }
+    
+    // Draw maze walls
+    function drawMaze() {
+      ctx.strokeStyle = '#1919A6';
+      ctx.lineWidth = 4;
+      
+      // Outer walls
+      ctx.strokeRect(50, 50, 500, 500);
+      
+      // Inner walls (simple maze structure)
+      const walls = [
+        [150, 150, 200, 150],
+        [150, 150, 150, 250],
+        [350, 150, 400, 150],
+        [400, 150, 400, 250],
+        [250, 250, 350, 250],
+        [150, 350, 200, 350],
+        [150, 350, 150, 450],
+        [350, 350, 400, 350],
+        [400, 350, 400, 450],
+        [250, 450, 350, 450]
+      ];
+      
+      walls.forEach(wall => {
+        ctx.beginPath();
+        ctx.moveTo(wall[0], wall[1]);
+        ctx.lineTo(wall[2], wall[3]);
+        ctx.stroke();
+      });
+    }
+    
+    // Main draw function
+    function draw() {
+      // Clear canvas
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw maze
+      drawMaze();
+      
+      // Draw pasta dots
+      pastas.forEach(pasta => {
+        if (!pasta.eaten) {
+          drawPasta(pasta.x, pasta.y, pasta.type);
+        }
+      });
+      
+      // Draw Pac-Man
+      drawShellPacman(pacman.x, pacman.y, pacman.size, pacmanAngle, pacmanDirection);
+      
+      // Animate mouth
+      if (mouthOpen) {
+        pacmanAngle += 0.02;
+        if (pacmanAngle > 0.6) mouthOpen = false;
+      } else {
+        pacmanAngle -= 0.02;
+        if (pacmanAngle < 0.1) mouthOpen = true;
+      }
+      
+      // Check for pasta eating
+      pastas.forEach(pasta => {
+        if (!pasta.eaten) {
+          const dx = pasta.x - pacman.x;
+          const dy = pasta.y - pacman.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < pacman.size) {
+            pasta.eaten = true;
+            score += 10;
+            scoreElement.textContent = score;
+          }
+        }
+      });
+      
+      requestAnimationFrame(draw);
+    }
+    
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      const speed = 5;
+      
+      switch(e.key) {
+        case 'ArrowRight':
+          pacman.x = Math.min(pacman.x + speed, 520);
+          pacmanDirection = 0;
+          break;
+        case 'ArrowLeft':
+          pacman.x = Math.max(pacman.x - speed, 80);
+          pacmanDirection = 2;
+          break;
+        case 'ArrowDown':
+          pacman.y = Math.min(pacman.y + speed, 520);
+          pacmanDirection = 1;
+          break;
+        case 'ArrowUp':
+          pacman.y = Math.max(pacman.y - speed, 80);
+          pacmanDirection = 3;
+          break;
+      }
+    });
+    
+    // Start animation
+    draw();
+  </script>
+</body>
+</html>
